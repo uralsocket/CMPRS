@@ -1,0 +1,41 @@
+{
+  "version": "1.0.6",
+  "allAssertionsPassed": true,
+  "cases": [
+    {
+      "name": "probe",
+      "passed": true,
+      "seconds": 0.17
+    },
+    {
+      "name": "stall",
+      "passed": true,
+      "seconds": 4.32
+    },
+    {
+      "name": "cancel",
+      "passed": true,
+      "seconds": 4.31
+    },
+    {
+      "name": "crash",
+      "passed": true,
+      "seconds": 0.17
+    },
+    {
+      "name": "failure",
+      "passed": true,
+      "seconds": 0.18
+    },
+    {
+      "name": "inherited_stdout",
+      "passed": true,
+      "seconds": 0.17
+    },
+    {
+      "name": "progress",
+      "passed": true,
+      "seconds": 2.56
+    }
+  ]
+}

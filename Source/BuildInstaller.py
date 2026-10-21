@@ -6,7 +6,7 @@ app=stage/'CMPRS Installer.app'
 contents=app/'Contents';resources=contents/'Resources'
 (contents/'MacOS').mkdir(parents=True,exist_ok=True)
 resources.mkdir(exist_ok=True)
-info={'CFBundleIdentifier':'local.gleb.cmprs-installer','CFBundleName':'CMPRS Installer','CFBundleDisplayName':'CMPRS Installer','CFBundleExecutable':'CMPRSInstaller','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.0.5','CFBundleVersion':'7','CFBundleIconFile':'CMPRS.icns','CFBundleDevelopmentRegion':'en','CFBundleLocalizations':['en','ru'],'LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication','LSApplicationCategoryType':'public.app-category.utilities','NSHumanReadableCopyright':'© 2026 Gleb Karavaev. AGPL-3.0-or-later.'}
+info={'CFBundleIdentifier':'local.gleb.cmprs-installer','CFBundleName':'CMPRS Installer','CFBundleDisplayName':'CMPRS Installer','CFBundleExecutable':'CMPRSInstaller','CFBundlePackageType':'APPL','CFBundleShortVersionString':'1.0.6','CFBundleVersion':'8','CFBundleIconFile':'CMPRS.icns','CFBundleDevelopmentRegion':'en','CFBundleLocalizations':['en','ru'],'LSMinimumSystemVersion':'13.0','NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication','LSApplicationCategoryType':'public.app-category.utilities','NSHumanReadableCopyright':'© 2026 Gleb Karavaev. AGPL-3.0-or-later.'}
 (contents/'Info.plist').write_bytes(plistlib.dumps(info))
 shutil.copy2(package/'Artwork/CMPRS.icns',resources/'CMPRS.icns')
 for locale,name in [('en','Install CMPRS'),('ru','Установить CMPRS')]:

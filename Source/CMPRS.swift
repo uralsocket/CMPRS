@@ -18,15 +18,52 @@ struct Failure: LocalizedError {
     var errorDescription: String? { message }
 }
 
+// The journal exists during processing, including when an encoder stops responding.
+final class DiagnosticJournal: @unchecked Sendable {
+    let url: URL
+    private let lock = NSLock()
+    private let handle: FileHandle?
+
+    init() {
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CMPRS")
+        let fallback = FileManager.default.temporaryDirectory.appendingPathComponent("CMPRS")
+        let root = (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)) != nil ? folder : fallback
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        url = root.appendingPathComponent("Session-\(UUID().uuidString).log")
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        handle = try? FileHandle(forWritingTo: url)
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "development"
+        write("CMPRS \(version) · \(ProcessInfo.processInfo.operatingSystemVersionString) · arm64 · CPU \(ProcessInfo.processInfo.activeProcessorCount) · RAM \(ProcessInfo.processInfo.physicalMemory / 1_073_741_824) GiB")
+    }
+
+    func write(_ text: String) {
+        lock.lock(); defer { lock.unlock() }
+        try? handle?.write(contentsOf: Data("[\(ISO8601DateFormatter().string(from: Date()))] \(text)\n".utf8))
+    }
+
+    func contents() -> String {
+        lock.lock(); defer { lock.unlock() }
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? "Не удалось прочитать журнал: \(url.path)"
+    }
+
+    deinit { try? handle?.close() }
+}
+
 final class Compressor: @unchecked Sendable {
     let bin: URL
+    let journal = DiagnosticJournal()
     private let lock = NSLock()
     private var child: Process?
     private var cancelled = false
     var event: (String, Double) -> Void = { _, _ in }
+    // An idle limit, not a limit on the duration of an encoding job.
+    let probeIdleLimit: TimeInterval
+    let encodeIdleLimit: TimeInterval
 
-    init() {
-        bin = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/bin")
+    init(bin: URL? = nil, probeIdleLimit: TimeInterval = 60, encodeIdleLimit: TimeInterval = 300) {
+        self.bin = bin ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/bin")
+        self.probeIdleLimit = probeIdleLimit
+        self.encodeIdleLimit = encodeIdleLimit
     }
 
     var isCancelled: Bool {
@@ -37,56 +74,108 @@ final class Compressor: @unchecked Sendable {
     func cancel() {
         lock.lock()
         cancelled = true
-        if let p = child, p.isRunning { p.terminate() }
+        let process = child
         lock.unlock()
+        if let process, process.isRunning { process.terminate() }
     }
 
-    private func run(_ tool: String, _ args: [String], duration: Double = 0) throws -> Data {
+    private func run(_ tool: String, _ args: [String], duration: Double = 0, frameCount: Double = 0) throws -> Data {
         if isCancelled { throw Failure(message: "Отменено") }
         let p = Process()
         p.executableURL = bin.appendingPathComponent(tool)
         p.arguments = args
         p.standardInput = FileHandle.nullDevice
-        let output = Pipe()
+        // Regular files never wait for pipe EOF. A stopped child or an inherited
+        // stdout descriptor must not block cancellation or failure reporting.
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("CMPRS-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let stdoutURL = folder.appendingPathComponent("stdout")
+        let stderrURL = folder.appendingPathComponent("stderr")
+        FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let output = try FileHandle(forWritingTo: stdoutURL)
+        let errors = try FileHandle(forWritingTo: stderrURL)
+        let reader = try FileHandle(forReadingFrom: stdoutURL)
+        let errorReader = try FileHandle(forReadingFrom: stderrURL)
         p.standardOutput = output
-        // A file avoids pipe deadlocks and keeps full diagnostics for failures.
-        let errorURL = FileManager.default.temporaryDirectory.appendingPathComponent("CMPRS-\(UUID().uuidString).log")
-        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
-        let errorHandle = try FileHandle(forWritingTo: errorURL)
-        p.standardError = errorHandle
+        p.standardError = errors
         defer {
-            try? errorHandle.close()
-            try? FileManager.default.removeItem(at: errorURL)
+            try? output.close(); try? errors.close(); try? reader.close(); try? errorReader.close()
+            try? FileManager.default.removeItem(at: folder)
             lock.lock(); child = nil; lock.unlock()
         }
+        journal.write("Запуск \(tool): \(args)")
         lock.lock()
         if cancelled { lock.unlock(); throw Failure(message: "Отменено") }
         do { try p.run(); child = p; lock.unlock() }
-        catch { lock.unlock(); throw error }
-        var collected = Data()
-        var pending = ""
-        while true {
-            let chunk = output.fileHandleForReading.availableData
-            if chunk.isEmpty { break }
-            if tool == "ffprobe" { collected.append(chunk) }
-            else {
-                pending += String(decoding: chunk, as: UTF8.self)
-                while let lineEnd = pending.firstIndex(of: "\n") {
-                    let line = String(pending[..<lineEnd])
-                    pending.removeSubrange(...lineEnd)
-                    if line.hasPrefix("out_time_us="), let us = Double(line.dropFirst(12)), duration > 0 {
-                        event("Сжатие…", min(0.97, max(0, us / 1_000_000 / duration)))
-                    }
-                }
+        catch { lock.unlock(); journal.write("Ошибка запуска: \(error)"); throw error }
+        try? output.close(); try? errors.close()
+        journal.write("\(tool) PID \(p.processIdentifier)")
+        let started = ProcessInfo.processInfo.systemUptime
+        var changedAt = started, lastUI = started - 1, lastLog = started - 10
+        var stopAt: TimeInterval?, timeoutMessage: String?
+        var pending = "", fields: [String: String] = [:]
+        var lastFrame: Double = 0, lastTime: Double = 0, lastSize: Int64 = 0
+        var fraction: Double = -1
+        let destination = tool == "ffmpeg" ? args.last.map { URL(fileURLWithPath: $0) } : nil
+        let stage = tool == "ffprobe" ? "Чтение параметров…" : "Подготовка кадров…"
+        func consume(_ data: Data) {
+            guard tool == "ffmpeg", !data.isEmpty else { return }
+            pending += String(decoding: data, as: UTF8.self)
+            while let end = pending.firstIndex(of: "\n") {
+                let line = String(pending[..<end]); pending.removeSubrange(...end)
+                let pair = line.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                if pair.count == 2 { fields[String(pair[0])] = String(pair[1]).trimmingCharacters(in: .whitespacesAndNewlines) }
             }
         }
-        p.waitUntilExit()
-        if isCancelled { throw Failure(message: "Отменено") }
-        if p.terminationStatus != 0 {
-            let diagnostic = (try? String(contentsOf: errorURL, encoding: .utf8)) ?? ""
-            throw Failure(message: "\(tool): \(diagnostic.suffix(5000))")
+        while true {
+            let now = ProcessInfo.processInfo.systemUptime
+            if let data = try? reader.readToEnd() { consume(data) }
+            let frame = Double(fields["frame"] ?? "") ?? 0
+            let time = (Double(fields["out_time_us"] ?? "") ?? 0) / 1_000_000
+            let size = max(Int64(fields["total_size"] ?? "") ?? 0, destination.map { bytes($0) } ?? 0)
+            if frame > lastFrame || time > lastTime || size > lastSize {
+                changedAt = now; lastFrame = max(lastFrame, frame); lastTime = max(lastTime, time); lastSize = max(lastSize, size)
+            }
+            if time > 0 && duration > 0 { fraction = min(0.97, time / duration) }
+            else if frame > 0 && frameCount > 0 { fraction = min(0.97, frame / frameCount) }
+            if now - lastUI >= 1 {
+                let elapsed = Int(now - started)
+                let clock = "\(elapsed / 60):\(String(format: "%02d", elapsed % 60))"
+                let state = tool == "ffmpeg" && fraction >= 0 ? "Сжатие… \(Int(fraction * 100))% · \(Int(frame)) кадров" : stage
+                event("\(state) · \(clock)", fraction)
+                lastUI = now
+            }
+            if now - lastLog >= 10 {
+                if let data = try? errorReader.readToEnd(), !data.isEmpty { journal.write(String(decoding: data.suffix(24_000), as: UTF8.self)) }
+                journal.write("\(tool): \(Int(now - started)) с · кадры \(Int(frame)) · время видео \(time) · байт \(size)")
+                lastLog = now
+            }
+            guard p.isRunning else { break }
+            if stopAt == nil {
+                if isCancelled {
+                    stopAt = now; p.terminate()
+                } else if now - changedAt > (tool == "ffprobe" ? probeIdleLimit : encodeIdleLimit) {
+                    timeoutMessage = tool == "ffprobe" ? "Не удалось прочитать файл: ffprobe перестал отвечать." : "Кодировщик не продвинулся за 5 минут. Обработка остановлена; оригинал сохранён. Скопируйте диагностику для проверки причины."
+                    journal.write(timeoutMessage!)
+                    stopAt = now; p.terminate()
+                }
+            } else if now - stopAt! >= 3 {
+                // Only this still-running Process is signalled, never an arbitrary PID.
+                if p.isRunning { kill(p.processIdentifier, SIGKILL) }
+            }
+            Thread.sleep(forTimeInterval: 0.1)
         }
-        return collected
+        p.waitUntilExit()
+        let diagnostic = (try? String(contentsOf: stderrURL, encoding: .utf8)) ?? ""
+        journal.write("\(tool) завершён: \(p.terminationReason == .uncaughtSignal ? "сигнал" : "код") \(p.terminationStatus)\n\(diagnostic.suffix(24_000))")
+        if isCancelled { throw Failure(message: "Отменено") }
+        if let timeoutMessage { throw Failure(message: timeoutMessage) }
+        if p.terminationStatus != 0 {
+            let reason = p.terminationReason == .uncaughtSignal ? "сигнал \(p.terminationStatus)" : "код \(p.terminationStatus)"
+            throw Failure(message: "\(tool) (\(reason)): \(diagnostic.isEmpty ? "Кодировщик завершился без сообщения. Скопируйте диагностику." : String(diagnostic.suffix(5000)))")
+        }
+        return tool == "ffprobe" ? try Data(contentsOf: stdoutURL) : Data()
     }
 
     private func probe(_ url: URL) throws -> [String: Any] {
@@ -198,13 +287,17 @@ final class Compressor: @unchecked Sendable {
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else {
                 throw Failure(message: "Это не обычный файл")
             }
-            event("Проверка исходника…", 0)
+            journal.write("Исходник: \(url.path) · \(originalSize) байт")
+            event("Проверка исходника…", -1)
             let source = try probe(url)
             let video = streams(source, "video")
             guard video.contains(where: { !isCover($0) }) else { throw Failure(message: "В файле нет видео") }
             let format = source["format"] as? [String: Any] ?? [:]
             let duration = Double(text(format, "duration")) ?? 0
-            var args = ["-hide_banner", "-nostdin", "-n", "-loglevel", "error", "-xerror", "-noautorotate", "-i", url.path,
+            let mainVideo = video.first { !isCover($0) } ?? [:]
+            let frameCount = Double(text(mainVideo, "nb_frames")) ?? 0
+            journal.write("Видео: \(text(mainVideo, "codec_name")) \(text(mainVideo, "width"))×\(text(mainVideo, "height")) \(text(mainVideo, "pix_fmt")) · FPS \(text(mainVideo, "avg_frame_rate")) · \(duration) с")
+            var args = ["-hide_banner", "-nostdin", "-n", "-loglevel", "info", "-xerror", "-noautorotate", "-i", url.path,
                         "-map", "0", "-map_metadata", "0", "-map_chapters", "0", "-copy_unknown", "-c", "copy"]
             for (i, v) in video.enumerated() where !isCover(v) {
                 let (pixel, codec) = try pixelFormat(v)
@@ -241,8 +334,8 @@ final class Compressor: @unchecked Sendable {
                 throw Failure(message: "Исходные субтитры нельзя без изменений поместить в MOV. Файл пропущен.")
             }
             args += ["-movflags", "+faststart+use_metadata_tags", "-progress", "pipe:1", "-nostats", "-f", "mov", temporary.path]
-            event("Сжатие…", 0)
-            _ = try run("ffmpeg", args, duration: duration)
+            event("Подготовка кадров…", -1)
+            _ = try run("ffmpeg", args, duration: duration, frameCount: frameCount)
             event("Проверка результата…", 0.98)
             let destination = try probe(temporary)
             try validate(source, destination)
@@ -283,6 +376,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, @unc
     var progress: NSProgressIndicator!
     var log: NSTextView!
     var button: NSButton!
+    var diagnosticsButton: NSButton!
     var working = false
     var closeWhenDone = false
     var pending: [String]
@@ -314,13 +408,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, @unc
         scroll.documentView = log
         button = NSButton(title: "Отменить", target: self, action: #selector(cancelOrClose))
         button.bezelStyle = .rounded
-        for view in [titleLabel!, detailLabel!, progress!, scroll, button!] { view.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(view) }
+        diagnosticsButton = NSButton(title: "Скопировать диагностику", target: self, action: #selector(copyDiagnostics))
+        diagnosticsButton.bezelStyle = .rounded
+        for view in [titleLabel!, detailLabel!, progress!, scroll, button!, diagnosticsButton!] { view.translatesAutoresizingMaskIntoConstraints = false; root.addSubview(view) }
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 22), titleLabel.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 22),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -22),
             detailLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 9), detailLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor), detailLabel.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -22),
             progress.topAnchor.constraint(equalTo: detailLabel.bottomAnchor, constant: 16), progress.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor), progress.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -22),
             scroll.topAnchor.constraint(equalTo: progress.bottomAnchor, constant: 18), scroll.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -22), scroll.bottomAnchor.constraint(equalTo: button.topAnchor, constant: -16),
+            diagnosticsButton.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 22), diagnosticsButton.centerYAnchor.constraint(equalTo: button.centerYAnchor),
             button.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -22), button.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18)
         ])
         window.center(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
@@ -335,9 +432,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, @unc
         log.scrollToEndOfDocument(nil)
     }
 
+    @objc func copyDiagnostics() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(worker.journal.contents(), forType: .string)
+        diagnosticsButton.title = "Диагностика скопирована"
+    }
+
     func start() {
         working = true
         let paths = pending
+        let reportURL = saveReport([])
+        append("Журнал: \(worker.journal.url.path)\n")
         append("Файлов в очереди: \(paths.count). Оригиналы сохраняются.\n")
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "Сжатие видео CMPRS")
@@ -347,18 +452,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, @unc
                 DispatchQueue.main.async { [self] in titleLabel.stringValue = "Файл \(index + 1) из \(paths.count)"; append(URL(fileURLWithPath: path).lastPathComponent) }
                 worker.event = { [self] text, value in
                     DispatchQueue.main.async { [self] in
-                        progress.doubleValue = (Double(index) + value) / Double(paths.count)
-                        detailLabel.stringValue = "\(text) \(Int(value * 100))% · \(URL(fileURLWithPath: path).lastPathComponent)"
+                        progress.isIndeterminate = value < 0
+                        if value < 0 { progress.startAnimation(nil) }
+                        else { progress.stopAnimation(nil); progress.doubleValue = (Double(index) + value) / Double(paths.count) }
+                        detailLabel.stringValue = "\(text) · \(URL(fileURLWithPath: path).lastPathComponent)"
                     }
                 }
                 let result = worker.compress(path)
                 results.append(result)
+                worker.journal.write("Результат: \(result.status) · \(result.message)")
+                saveReport(results, to: reportURL)
                 DispatchQueue.main.async { [self] in append("\(result.status == "ok" ? "✓" : "•") \(result.message)\n") }
             }
-            let logURL = saveReport(results)
+            let logURL = saveReport(results, to: reportURL)
             DispatchQueue.main.async { [self] in
                 working = false
-                progress.doubleValue = 1
+                progress.stopAnimation(nil); progress.isIndeterminate = false; progress.doubleValue = 1
                 let ok = results.filter { $0.status == "ok" }.count
                 titleLabel.stringValue = worker.isCancelled ? "Сжатие отменено" : "Обработка завершена"
                 detailLabel.stringValue = "Сохранено: \(ok) · Пропущено / ошибки: \(results.count - ok) · Всего: \(paths.count)"
