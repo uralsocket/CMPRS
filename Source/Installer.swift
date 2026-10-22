@@ -17,6 +17,10 @@ struct Installation {
     let home: URL
     let payload: URL
     let register: Bool
+    let sourceApp: URL?
+    init(home: URL, payload: URL, register: Bool, sourceApp: URL? = nil) {
+        self.home = home; self.payload = payload; self.register = register; self.sourceApp = sourceApp
+    }
     let fm = FileManager.default
     var appURL: URL { home.appendingPathComponent("Applications/\(Self.appName)") }
     var workflowURL: URL { home.appendingPathComponent("Library/Services/\(Self.actionName)") }
@@ -46,7 +50,7 @@ struct Installation {
     }
 
     func install() throws -> String? {
-        let sourceApp = payload.appendingPathComponent(Self.appName)
+        let sourceApp = self.sourceApp ?? payload.appendingPathComponent(Self.appName)
         let sourceAction = payload.appendingPathComponent(Self.actionName)
         guard fm.fileExists(atPath: sourceAction.appendingPathComponent("Contents/document.wflow").path) else {
             throw InstallFailure(message: tr("Установочный комплект повреждён. Скачайте его заново.", "The installer is incomplete. Download it again."))
@@ -127,7 +131,7 @@ final class InstallerDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate
     var spinner: NSProgressIndicator!
     var working = false
     var completed = false
-    let installation = Installation(home: FileManager.default.homeDirectoryForCurrentUser, payload: Bundle.main.resourceURL!.appendingPathComponent("Payload"), register: true)
+    let installation = Installation(home: FileManager.default.homeDirectoryForCurrentUser, payload: Bundle.main.resourceURL!.appendingPathComponent("Payload"), register: true, sourceApp: Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/CMPRS Ironclad.app"))
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)

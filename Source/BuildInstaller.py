@@ -16,9 +16,17 @@ licensepath=resources/'Licenses'
 if not licensepath.exists():shutil.copytree(package/'Licenses',licensepath)
 source=resources/'Source';source.mkdir(exist_ok=True)
 shutil.copy2(package/'Source/Installer.swift',source/'Installer.swift')
-(source/'Build.txt').write_text('xcrun swiftc -O -swift-version 5 -target arm64-apple-macos13.0 Installer.swift -framework AppKit -o CMPRSInstaller\nPayload: CMPRS Ironclad.app and CMPRS Ironclad 100%.workflow.\nThe complete source and build scripts are distributed separately in CMPRS-Ironclad.zip.\n')
+(source/'Build.txt').write_text('xcrun swiftc -O -swift-version 5 -target arm64-apple-macos13.0 Installer.swift -framework AppKit -o CMPRSInstaller\nContents/Helpers: CMPRS Ironclad.app. Resources/Payload: CMPRS Ironclad 100%.workflow.\nThe complete source and build scripts are distributed separately in CMPRS-Ironclad.zip.\n')
 payload=resources/'Payload';payload.mkdir(exist_ok=True)
-for name in ['CMPRS Ironclad.app','CMPRS Ironclad 100%.workflow']:
+# Nested executables belong in a standard code location. This keeps the inner
+# notarization ticket outside the outer resource seal after Xcode re-signing.
+helpers=contents/'Helpers';helpers.mkdir(exist_ok=True)
+main=helpers/'CMPRS Ironclad.app'
+if main.exists():shutil.rmtree(main)
+shutil.copytree(package/'CMPRS Ironclad.app',main)
+legacy=payload/'CMPRS Ironclad.app'
+if legacy.exists():shutil.rmtree(legacy)
+for name in ['CMPRS Ironclad 100%.workflow']:
  dest=payload/name
  if dest.exists():shutil.rmtree(dest)
  shutil.copytree(package/name,dest)
