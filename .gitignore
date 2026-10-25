@@ -1,10 +1,3 @@
-.DS_Store
-build/
-*.app/
-*.dmg
-*.zip
-*.xcarchive/
-Artwork/*.iconset/
-Artwork/CMPRS.icns
-ThirdPartySources/*.tar.*
-Installer-build/
+UI/node_modules/
+Build/
+.superdesign/tmp/

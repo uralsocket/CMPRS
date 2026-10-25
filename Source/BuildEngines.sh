@@ -26,3 +26,6 @@ cd "$ROOT/build/ffmpeg"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
 "$ROOT/build/source/ffmpeg-8.0.1/configure" --prefix="$PREFIX" --pkg-config="$PREFIX/bin/pkgconf" --pkg-config-flags=--static --extra-cflags="-I$PREFIX/include -mmacosx-version-min=13.0" --extra-ldflags="-L$PREFIX/lib -mmacosx-version-min=13.0" --extra-libs=-liconv --arch=arm64 --target-os=darwin --enable-gpl --enable-libx264 --enable-libdav1d --enable-gray --disable-autodetect --enable-zlib --enable-bzlib --enable-iconv --enable-videotoolbox --enable-audiotoolbox --disable-network --disable-ffplay --disable-doc --disable-debug --disable-shared --enable-static
 make -j8; make install
+
+mkdir -p "$ROOT/Resources/bin"
+cp "$PREFIX/bin/ffmpeg" "$PREFIX/bin/ffprobe" "$ROOT/Resources/bin/"

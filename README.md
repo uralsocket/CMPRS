@@ -1,60 +1,45 @@
 # CMPRS
 
-**Smaller videos. More room.**
+A small Finder-first video compressor for macOS. Select one video or a batch, right-click, and choose **CMPRS — Compress video**. An animated ASCII eye watches the progress. Each file shows its original and compressed size. Cancel while processing; Done closes the finished batch.
 
-A small, open-source utility for batch video compression, right in Finder. Free and local.
+## Download and install
 
-[Download for Mac](https://github.com/uralsocket/CMPRS/releases/latest) · [Website](https://gleb.day/cmprs/) · [Support](https://gleb.day/cmprs/support/)
+Apple Silicon (M1 or newer), macOS 13 or later. This release does not run on Intel Macs. Download the DMG from [Releases](https://github.com/uralsocket/CMPRS/releases), open **Install CMPRS**, and click Install. The installer adds the app to `~/Applications` and registers its Finder service. It retires identified old CMPRS workflows with a recoverable backup and preserves unrelated workflows.
 
-## Getting started
+Finder normally displays the action directly in its context menu. macOS may group services under **Services**. If it is hidden, enable it under System Settings → Keyboard → Keyboard Shortcuts → Services → Files and Folders. To remove the menu item, disable that checkbox. Automator actions, if installed by an old release, live in `~/Library/Services`.
 
-1. Open the DMG, launch **Install CMPRS**, and click **Install**. No terminal or administrator password is required.
-2. Select one or more videos in Finder.
-3. Choose **Quick Actions → CMPRS Ironclad 100%**. On some macOS versions, the action appears under **Services**.
+## Compression
 
-MOV results are saved beside the source files with the `CMPRS-` prefix. Originals and previous results are never overwritten. A number is added if a filename is already taken. If compression does not make a file smaller, no extra copy is saved.
+- Ironclad preset: software x264, CRF 24, preset slow.
+- Always MOV. Output: `CMPRS-[name].mov` beside the original; name collisions receive `(2)`, `(3)`, and so on.
+- Original dimensions and frame timing are retained and checked. Originals and earlier outputs are never overwritten.
+- Compatible SDR H.264 in 4:2:0. Reducing 10/12-bit video to 8-bit requires confirmation for that batch. HDR/Dolby Vision and transparency are skipped unchanged.
+- AAC audio is copied. Other audio uses AAC without deliberately changing channel count or sample rate. Unsupported subtitle/container combinations are skipped.
+- The result is kept only if it is smaller. Lossy compression is not guaranteed to shrink every source or be visually identical to it.
 
-**Requires Apple Silicon (M1 or later) and macOS 13 or later.**
+## Privacy and language
 
-The app and installer are signed with Developer ID and notarized by Apple. The current compression window uses Russian labels; the installer supports English and Russian. The website opens in English and offers a Russian language switch.
+Video processing stays on the Mac. No uploads, telemetry, log files, batch reports or processing history. Encoder diagnostics are discarded; errors are shown briefly in the current queue. Queue state and source-folder permissions last only for the current app session. macOS asks for access to the exact source folder when needed so the app can save next to the originals.
 
-## Compression profile
+The interface follows the macOS application language: Russian or English, with English as the fallback. There is no language switch or remembered language setting. WebKit uses an ephemeral data store and the local UI blocks network requests and external navigation. The app retains its existing sandbox and WebKit network-client entitlement; the bundled FFmpeg build has no network support.
 
-Ironclad is based on [compressO](https://github.com/codeforreal1/compressO/tree/dca85e4a9555fb635d56e2a85ebf200553206c9e): `libx264`, `CRF 24`, `preset slow`, and H.264 in a MOV container. “100%” identifies the original preset’s quality setting; it does not mean lossless compression.
+## Build
 
-CMPRS preserves frame dimensions, source frame timestamps, supported 8/10-bit depth, and 4:2:0 / 4:2:2 / 4:4:4 chroma. Audio is copied; audio formats incompatible with MOV are decoded to lossless PCM. Supported metadata is retained, and the result is checked before saving.
-
-HDR, Dolby Vision, transparency, unsupported pixel formats, and incompatible tracks are skipped with an explanation. Some professional H.264 profiles do not play in QuickTime. Output size depends on the source. Video compression is lossy.
-
-## Processing diagnostics
-
-In **1.0.6**, progress is read from a regular file, removing the blocking pipe EOF wait. Before the first encoded frames, the app shows a preparation timer. If the encoder produces no new frames, timestamps, or output data for five minutes, CMPRS stops it and reports an error. Encoding that continues to make progress has no overall time limit. Cancellation forcibly stops a process that ignores the normal termination signal.
-
-The diagnostics button at the bottom of the processing window is available while a job is running. Logs are stored locally in `~/Library/Logs/CMPRS/` and include the app version, video properties, commands, and FFmpeg messages. They are never sent automatically.
-
-Validation covers [14 media scenarios](Verification.json) and [7 process lifecycle scenarios](ProcessVerification.json), including a stalled encoder, crashes, inherited stdout, and cancellation. A successful local test does not establish that every machine-specific issue is resolved; copied diagnostics help investigate failures on another Mac.
-
-## Building from source
-
-You need Apple Silicon, Xcode / Command Line Tools, Python 3.9+, and an internet connection for the initial tool downloads. From the project root:
+Requires an Apple Silicon Mac, Xcode command-line tools, Python 3, Node.js and pnpm.
 
 ```sh
-bash Source/Build.command
-bash Source/BuildInstaller.command
+# Required for a Git checkout; optional in the full source release archive, which includes the exact tools.
+bash Source/BuildEngines.sh
+cd UI
+pnpm install --frozen-lockfile
+pnpm build
+cd ..
+python3 Build.py
+# For a distributable Developer ID build, pass your signing identity:
+python3 Build.py --identity 'Developer ID Application: Your Name (TEAMID)'
+python3 Installer/BuildInstaller.py --app Release/CMPRS.app --identity 'Developer ID Application: Your Name (TEAMID)'
 ```
 
-The first command builds FFmpeg 8.0.1, x264 core 164, and dav1d 1.5.1 from pinned sources, then builds the Swift app. Intermediate files stay in `build/`. The full third-party source archives are included in [CMPRS-Source-1.0.6.zip](https://github.com/uralsocket/CMPRS/releases/download/v1.0.6/CMPRS-Source-1.0.6.zip). Repository builds download the archives with SHA-256 verification.
+`Build.py` defaults to `Build/CMPRS.app`; use `--output-dir Release` for the last installer example. It validates the actual encoder architectures and refuses to label an ARM-only engine universal. The installer targets the same architectures as its payload. Notarize and staple both app and installer before public distribution.
 
-By default, builds use an ad-hoc signature for local use. For distribution, set `CMPRS_SIGNING_IDENTITY` to your Developer ID Application identity, then separately submit the app and installer for Apple notarization. Check the notarization tickets for both the installer and its nested app after export. No private keys or credentials are included in this repository.
-
-Public releases use a minimal, locally built FFmpeg rather than the broader prebuilt upstream bundle. H.264 encoding still uses software x264 with CRF 24 / slow. FFmpeg’s built-in decoders and dav1d handle common containers and AV1. Network protocols are disabled. Unsupported inputs fail with a message, leaving originals intact.
-
-## Project layout
-
-- `Source/CMPRS.swift` — compression, queue, and progress window.
-- `Source/Installer.swift` — graphical installation, updates, and rollback on failure.
-- `Resources/` — app manifest and Automator action.
-- `Source/BuildEngines.sh`, `FetchSources.py` — pinned codec build.
-- `Licenses/` — licenses and notices.
-
-CMPRS is licensed under AGPL-3.0-or-later. The FFmpeg/x264 executables are GPL-2.0-or-later; dav1d is BSD-2-Clause. See [NOTICE](Licenses/NOTICE.md). Developed by Gleb Karavaev. Contact: uralsocket@gmail.com.
+AGPL-3.0-or-later. FFmpeg/x264 GPL and other third-party notices are included in [NOTICE.md](NOTICE.md). Complete corresponding engine archives are included. Support: https://gleb.day/cmprs/support/ · uralsocket@gmail.com.
