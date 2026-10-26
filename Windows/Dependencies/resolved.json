@@ -1,0 +1,48 @@
+{
+  "sdk": {
+    "name": "dotnet-sdk-osx-arm64.tar.gz",
+    "rid": "osx-arm64",
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.427/dotnet-sdk-8.0.427-osx-arm64.tar.gz",
+    "hash": "79786b93f249d233b15f1d6338d4798bd71c8143f267c5e84de76c9eb8a1054920e56ea5478f7bddfb74b951cc58aaca11fbd780cf134350b7cb7cdcb42a8c8c"
+  },
+  "sdkVersion": "8.0.427",
+  "webView2": "1.0.4314.35",
+  "ffmpegAssets": [
+    {
+      "name": "ffmpeg-7.1.1-essentials_build.7z",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.7z",
+      "digest": null,
+      "size": 28141686
+    },
+    {
+      "name": "ffmpeg-7.1.1-essentials_build.zip",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip",
+      "digest": null,
+      "size": 92234348
+    },
+    {
+      "name": "ffmpeg-7.1.1-full_build-shared.7z",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build-shared.7z",
+      "digest": null,
+      "size": 46646819
+    },
+    {
+      "name": "ffmpeg-7.1.1-full_build-shared.zip",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build-shared.zip",
+      "digest": null,
+      "size": 71806900
+    },
+    {
+      "name": "ffmpeg-7.1.1-full_build.7z",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build.7z",
+      "digest": null,
+      "size": 54252413
+    },
+    {
+      "name": "ffmpeg-7.1.1-full_build.zip",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build.zip",
+      "digest": null,
+      "size": 177650503
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "dotnet-sdk.tar.gz": {
+    "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.427/dotnet-sdk-8.0.427-osx-arm64.tar.gz",
+    "hash": "79786b93f249d233b15f1d6338d4798bd71c8143f267c5e84de76c9eb8a1054920e56ea5478f7bddfb74b951cc58aaca11fbd780cf134350b7cb7cdcb42a8c8c",
+    "algorithm": "sha512"
+  },
+  "ffmpeg-7.1.1.zip": {
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip",
+    "hash": "04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4",
+    "algorithm": "sha256"
+  },
+  "MicrosoftEdgeWebview2Setup.exe": {
+    "url": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+    "hash": "ca4c9016c70e2184c5e231662e0e98abf4826647180ef3faab32fcb1ca2ec15e",
+    "algorithm": "sha256"
+  }
+}

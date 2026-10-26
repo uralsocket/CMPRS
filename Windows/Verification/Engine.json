@@ -1,0 +1,218 @@
+[
+  {
+    "name": "normal.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 2421002,
+      "OutputBytes": 338145
+    }
+  },
+  {
+    "name": "normal.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "normal.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "120fps.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 763024,
+      "OutputBytes": 53365
+    }
+  },
+  {
+    "name": "120fps.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "120fps.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "4k.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 6590717,
+      "OutputBytes": 1129615
+    }
+  },
+  {
+    "name": "4k.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "4k.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "portrait.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 564250,
+      "OutputBytes": 94167
+    }
+  },
+  {
+    "name": "portrait.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "portrait.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "audio-surround.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 716548,
+      "OutputBytes": 31553
+    }
+  },
+  {
+    "name": "audio-surround.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "audio-surround.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "rotation.mov",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null,
+      "InputBytes": 564250,
+      "OutputBytes": 94167
+    }
+  },
+  {
+    "name": "rotation.mov source intact",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "rotation.mov stages",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "exclusive output naming",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "irregular VFR rejected safely",
+    "passed": true,
+    "evidence": {
+      "Status": "error",
+      "Message": "timing"
+    }
+  },
+  {
+    "name": "10-bit needs consent",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "10-bit approved",
+    "passed": true,
+    "evidence": {
+      "Status": "ok",
+      "Message": null
+    }
+  },
+  {
+    "name": "hdr.mov preserved by skipping",
+    "passed": true,
+    "evidence": {
+      "Status": "skipped",
+      "Message": "hdr"
+    }
+  },
+  {
+    "name": "alpha.mov preserved by skipping",
+    "passed": true,
+    "evidence": {
+      "Status": "skipped",
+      "Message": "alpha"
+    }
+  },
+  {
+    "name": "odd.mkv preserved by skipping",
+    "passed": true,
+    "evidence": {
+      "Status": "skipped",
+      "Message": "odd"
+    }
+  },
+  {
+    "name": "larger result discarded",
+    "passed": true,
+    "evidence": {
+      "Status": "skipped",
+      "Message": "larger"
+    }
+  },
+  {
+    "name": "corrupt input fails",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "cancellation",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "stalled probe watchdog",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "stalled encoder watchdog",
+    "passed": true,
+    "evidence": {
+      "Status": "error",
+      "Message": "encode-timeout"
+    }
+  },
+  {
+    "name": "no temporary MOV files",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "no log files",
+    "passed": true,
+    "evidence": null
+  },
+  {
+    "name": "Ironclad exactly",
+    "passed": true,
+    "evidence": null
+  }
+]

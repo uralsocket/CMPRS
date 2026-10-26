@@ -1,8 +1,21 @@
 # CMPRS
 
-A small Finder-first video compressor for macOS. Select one video or a batch, right-click, and choose **CMPRS — Compress video**. An animated ASCII eye watches the progress. Each file shows its original and compressed size. Cancel while processing; Done closes the finished batch.
+A small video compressor for macOS and Windows. Select one video or a batch in Finder or File Explorer, right-click, and choose **CMPRS — Compress video**. An animated ASCII eye watches the progress. Each file shows its original and compressed size. Cancel while processing; Done closes the finished batch.
 
 ## Download and install
+
+| Platform | Requirements | Download |
+| --- | --- | --- |
+| macOS 2.0.0 | Apple Silicon (M1+), macOS 13+ | [Mac installer](https://github.com/uralsocket/CMPRS/releases/download/v2.0.0/CMPRS-2.0.0-AppleSilicon.dmg) |
+| Windows 2.0.1 | Intel/AMD x64, Windows 10 22H2 / 11, .NET Framework 4.8 | [Windows installer](https://github.com/uralsocket/CMPRS/releases/download/v2.0.1/CMPRS-2.0.1-Windows-x64-Setup.exe) |
+
+### Windows
+
+Open the setup EXE and click **Install**. It includes FFmpeg and registers the Explorer action, Start menu shortcut and Windows uninstaller for the current user. Microsoft WebView2 is installed automatically if missing; that step needs internet. The installer is unsigned. In Windows 11, the action is under **Show more options** (Shift+F10); **Send to → CMPRS** also accepts a batch. Remove CMPRS through **Settings → Apps → Installed apps**. The Windows build has been tested and reported working by its owner.
+
+Windows sources, build instructions, dependency versions and notices: [Windows/](Windows/). It uses the same Ironclad x264/CRF24/slow profile and compact React eye as the Mac version. Native Windows ARM64 is not included.
+
+### macOS
 
 Apple Silicon (M1 or newer), macOS 13 or later. This release does not run on Intel Macs. Download the DMG from [Releases](https://github.com/uralsocket/CMPRS/releases), open **Install CMPRS**, and click Install. The installer adds the app to `~/Applications` and registers its Finder service. It retires identified old CMPRS workflows with a recoverable backup and preserves unrelated workflows.
 
@@ -19,11 +32,11 @@ Finder normally displays the action directly in its context menu. macOS may grou
 
 ## Privacy and language
 
-Video processing stays on the Mac. No uploads, telemetry, log files, batch reports or processing history. Encoder diagnostics are discarded; errors are shown briefly in the current queue. Queue state and source-folder permissions last only for the current app session. macOS asks for access to the exact source folder when needed so the app can save next to the originals.
+Video processing stays on your computer. No uploads, telemetry, log files, batch reports or processing history. Encoder diagnostics are discarded; errors are shown briefly in the current queue. Queue state and source-folder permissions last only for the current app session. macOS asks for access to the exact source folder when needed so the app can save next to the originals.
 
-The interface follows the macOS application language: Russian or English, with English as the fallback. There is no language switch or remembered language setting. WebKit uses an ephemeral data store and the local UI blocks network requests and external navigation. The app retains its existing sandbox and WebKit network-client entitlement; the bundled FFmpeg build has no network support.
+The interface follows the system/application language: Russian or English, with English as the fallback. There is no language switch or remembered language setting. The Mac interface uses an ephemeral WebKit data store; Windows uses a temporary InPrivate WebView2 profile with cleanup on normal exit. Both local interfaces block external navigation and network requests. The app retains its existing sandbox and WebKit network-client entitlement; the Mac FFmpeg build has no network support. The Windows engine restricts input protocols to local files and pipes.
 
-## Build
+## Build for macOS
 
 Requires an Apple Silicon Mac, Xcode command-line tools, Python 3, Node.js and pnpm.
 
@@ -42,4 +55,4 @@ python3 Installer/BuildInstaller.py --app Release/CMPRS.app --identity 'Develope
 
 `Build.py` defaults to `Build/CMPRS.app`; use `--output-dir Release` for the last installer example. It validates the actual encoder architectures and refuses to label an ARM-only engine universal. The installer targets the same architectures as its payload. Notarize and staple both app and installer before public distribution.
 
-AGPL-3.0-or-later. FFmpeg/x264 GPL and other third-party notices are included in [NOTICE.md](NOTICE.md). Complete corresponding engine archives are included. Support: https://gleb.day/cmprs/support/ · uralsocket@gmail.com.
+AGPL-3.0-or-later. FFmpeg/x264 GPL and other third-party notices are included in [NOTICE.md](NOTICE.md). The Mac source release includes its corresponding engine archives. Windows dependency/source references are described separately in [Windows/NOTICE.md](Windows/NOTICE.md). Support: https://gleb.day/cmprs/support/ · uralsocket@gmail.com.

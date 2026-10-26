@@ -1,0 +1,15 @@
+Build/
+Dependencies/dotnet/
+Dependencies/*.tar.gz
+Dependencies/*.zip
+Dependencies/ffmpeg/
+Dependencies/*Setup.exe
+UI/node_modules/
+App/bin/
+App/obj/
+Installer/bin/
+Installer/obj/
+Verification/bin/
+Verification/obj/
+Original/
+*.DS_Store

@@ -1,0 +1,9 @@
+{
+  "installerPE": "AMD64",
+  "embeddedPayloadCRC": "pass",
+  "embeddedFileChecksums": 25,
+  "engineAndLoaderArchitecture": "AMD64",
+  "actualReactBundleIncluded": true,
+  "highDpiConfigIncluded": true,
+  "windowsExecuted": false
+}

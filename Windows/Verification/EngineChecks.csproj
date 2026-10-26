@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><ImplicitUsings>disable</ImplicitUsings><Nullable>disable</Nullable><RestorePackagesWithLockFile>true</RestorePackagesWithLockFile></PropertyGroup>
+ <ItemGroup><Compile Include="../Engine/CompressionEngine.cs" Link="CompressionEngine.cs" /><PackageReference Include="Newtonsoft.Json" Version="13.0.3" /></ItemGroup>
+</Project>
